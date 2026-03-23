@@ -1,5 +1,11 @@
+import HeroPage from "@/pages/Hero";
+
 function App() {
-  return <></>;
+  return (
+    <>
+      <HeroPage />
+    </>
+  );
 }
 
 export default App;

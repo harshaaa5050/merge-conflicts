@@ -2,8 +2,8 @@
   "compilerOptions": {
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"] // Adjust the path if your source code is not in a 'src' directory
-      // You can add other aliases here as needed
+      "@/*": ["./src/*"]
     }
-  }
+  },
+  "include": ["src"]
 }
