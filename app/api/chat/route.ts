@@ -1,5 +1,12 @@
 import { consumeStream, convertToModelMessages, streamText, UIMessage } from 'ai'
 
+import {createOpenAI} from '@ai-sdk/openai'
+
+const openrouter = createOpenAI({
+  baseURL: 'https://openrouter.ai/api/v1',
+  apiKey: process.env.OPENROUTER_API_KEY,
+})
+
 export const maxDuration = 30
 
 const SYSTEM_PROMPT = `You are Matri, a warm, empathetic AI wellness companion designed specifically for women's mental health. Your communication style is:
@@ -30,7 +37,7 @@ export async function POST(req: Request) {
   const { messages }: { messages: UIMessage[] } = await req.json()
 
   const result = streamText({
-    model: 'openai/gpt-5-mini',
+    model: openrouter.chat('arcee-ai/trinity-large-preview:free'),
     system: SYSTEM_PROMPT,
     messages: await convertToModelMessages(messages),
     abortSignal: req.signal,
