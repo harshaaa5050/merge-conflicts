@@ -97,9 +97,9 @@ export function MoodCheckin({ onComplete }: MoodCheckinProps) {
                 onClick={() => setMood(option.value)}
                 className={`flex-1 py-3 px-2 rounded-lg text-xs font-medium border-2 transition-all ${
                   mood === option.value
-                    ? `${option.color} border-current ring-2 ring-offset-2 ring-primary/20`
-                    : `${option.color} border-transparent`
-                }`}
+                    ? `bg-primary/10 border-current ring-2 ring-offset-2 ring-primary/20`
+                    : `bg-secondary/50 border-transparent hover:bg-secondary`
+                } `}
               >
                 {option.label}
               </button>
