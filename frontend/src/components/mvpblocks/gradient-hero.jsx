@@ -1,10 +1,10 @@
 "use client";
 
 import React from "react";
+// eslint-disable-next-line no-unused-vars
 import { motion } from "framer-motion";
 import { ArrowRight, ChevronRight, ExternalLink, Github } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
 
 export default function GradientHero() {
   return (
