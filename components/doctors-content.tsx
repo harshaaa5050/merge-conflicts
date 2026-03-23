@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import {
   Card,
   CardContent,
@@ -20,8 +20,11 @@ import {
   Clock,
   Brain,
   Stethoscope,
+  Video,
+  Loader2,
 } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 interface Professional {
   id: string;
@@ -72,12 +75,34 @@ const REG_TYPE_CONFIG = {
   RCI: "border-teal-400/40 text-teal-700 dark:text-teal-400 bg-teal-50 dark:bg-teal-900/20",
 };
 
-export function DoctorsContent({ professionals }: DoctorsContentProps) {
+export function DoctorsContent({
+  professionals,
+  currentUserId,
+}: DoctorsContentProps) {
+  const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
   const [roleFilter, setRoleFilter] = useState("All");
 
   // Always hide unverified — users must never see pending or rejected professionals
   const verified = professionals.filter((p) => p.is_verified);
+  const [showAll, setShowAll] = useState(false);
+  const [startingCall, setStartingCall] = useState<string | null>(null);
+
+  const startVideoCall = useCallback(
+    async (professionalId: string) => {
+      setStartingCall(professionalId);
+      try {
+        // Generate a unique room name from user+professional+timestamp
+        const roomName = `matriai-${currentUserId.slice(0, 8)}-${professionalId.slice(0, 8)}-${Date.now()}`;
+        router.push(
+          `/consultation/${roomName}?professionalId=${professionalId}`,
+        );
+      } catch {
+        setStartingCall(null);
+      }
+    },
+    [currentUserId, router],
+  );
 
   const filtered = verified.filter((p) => {
     const q = searchQuery.toLowerCase();
@@ -104,7 +129,7 @@ export function DoctorsContent({ professionals }: DoctorsContentProps) {
   });
 
   return (
-    <main className="container px-4 py-8 max-w-5xl mx-auto">
+    <main className=" px-4 py-8 max-w-5xl mx-auto">
       <div className="mb-8">
         <h1 className="font-serif text-3xl font-medium text-foreground">
           Find Professional Help
@@ -261,6 +286,47 @@ export function DoctorsContent({ professionals }: DoctorsContentProps) {
                         </a>
                       </Button>
                     </div>
+                    {/* Action buttons — only shown for verified */}
+                    {pro.is_verified && (
+                      <div className="flex gap-2 pt-1">
+                        <Button
+                          size="sm"
+                          className="flex-1 gap-2"
+                          onClick={() => startVideoCall(pro.id)}
+                          disabled={startingCall === pro.id}
+                        >
+                          {startingCall === pro.id ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Video className="h-4 w-4" />
+                          )}
+                          Video Call
+                        </Button>
+                        <Button
+                          asChild
+                          size="sm"
+                          variant="outline"
+                          className="flex-1"
+                        >
+                          <a href={`mailto:${pro.email}`}>
+                            <Mail className="h-4 w-4 mr-2" />
+                            Email
+                          </a>
+                        </Button>
+                      </div>
+                    )}
+
+                    {pro.status === "pending" && (
+                      <p className="text-xs text-yellow-600 dark:text-yellow-400">
+                        This professional is awaiting verification and cannot be
+                        contacted yet.
+                      </p>
+                    )}
+                    {pro.status === "rejected" && (
+                      <p className="text-xs text-red-600 dark:text-red-400">
+                        Verification was not approved for this profile.
+                      </p>
+                    )}
                   </CardContent>
                 </Card>
               );
