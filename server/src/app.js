@@ -1,6 +1,7 @@
 import express from 'express'
 import cors from 'cors'
 import cookieParser from 'cookie-parser'
+import authRouter from './routes/authRoutes.js'
 
 
 const app = express()
@@ -16,5 +17,6 @@ app.use(
 	}),
 )
 
+app.use('/auth', authRouter)
 
 export default app
