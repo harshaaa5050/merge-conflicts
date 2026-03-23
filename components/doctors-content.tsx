@@ -123,7 +123,7 @@ export function DoctorsContent({
   const hiddenCount = filtered.length - displayed.length;
 
   return (
-    <main className="container px-4 py-8 max-w-5xl mx-auto">
+    <main className=" px-4 py-8 max-w-5xl mx-auto">
       <div className="mb-8">
         <h1 className="font-serif text-3xl font-medium text-foreground">
           Find Professional Help

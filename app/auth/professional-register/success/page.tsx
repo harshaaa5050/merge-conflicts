@@ -52,6 +52,9 @@ export default function ProfessionalRegisterSuccessPage() {
 
             <div className="flex flex-col gap-2">
               <Button asChild>
+                <Link href="/pro/dashboard">Go to Professional Dashboard</Link>
+              </Button>
+              <Button asChild variant="outline">
                 <Link href="/auth/login">Sign in to your account</Link>
               </Button>
               <Button asChild variant="ghost">

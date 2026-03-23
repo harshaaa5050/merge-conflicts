@@ -42,6 +42,7 @@ interface Props {
   userId: string;
   userName: string;
   professional: Professional;
+  isDoctor?: boolean;
 }
 
 type ConnectionState = "idle" | "connecting" | "connected" | "ended" | "error";
@@ -51,13 +52,17 @@ export function ConsultationRoom({
   userId,
   userName,
   professional,
+  isDoctor = false,
 }: Props) {
   const router = useRouter();
+  const exitPath = isDoctor ? "/pro/dashboard" : "/doctors";
   const roomRef = useRef<Room | null>(null);
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
-  // Store the local video track so we can attach it once the video element is mounted
+  // Store local video track — attach after connected screen renders
   const localVideoTrackRef = useRef<LocalVideoTrack | null>(null);
+  // Store pending remote video track — attach after connected screen renders
+  const pendingRemoteTrackRef = useRef<RemoteTrack | null>(null);
 
   const [connectionState, setConnectionState] =
     useState<ConnectionState>("idle");
@@ -66,6 +71,12 @@ export function ConsultationRoom({
   const [isCameraOff, setIsCameraOff] = useState(false);
   const [remoteConnected, setRemoteConnected] = useState(false);
   const [callDuration, setCallDuration] = useState(0);
+
+  // Dynamic labels — swap based on who is viewing
+  const remoteLabel = isDoctor ? "Patient" : professional.full_name;
+  const localLabel = isDoctor
+    ? `Dr. ${professional.full_name.split(" ").slice(-1)[0]}`
+    : "You";
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Format seconds to mm:ss
@@ -89,31 +100,38 @@ export function ConsultationRoom({
     }
   }, []);
 
-  const attachTrack = useCallback((track: RemoteTrack, isVideo: boolean) => {
-    const el = isVideo ? remoteVideoRef.current : null;
-    if (el && isVideo) track.attach(el);
+  const attachRemoteTrack = useCallback((track: RemoteTrack) => {
+    if (track.kind !== Track.Kind.Video) return;
+    if (remoteVideoRef.current) {
+      // Video element already mounted — attach immediately
+      track.attach(remoteVideoRef.current);
+    } else {
+      // Video element not mounted yet — store for deferred attach via useEffect
+      pendingRemoteTrackRef.current = track;
+    }
   }, []);
 
   const handleRemoteParticipant = useCallback(
     (participant: RemoteParticipant) => {
       setRemoteConnected(true);
       startTimer();
+
+      // Future tracks — fires when the remote participant publishes after we join
       participant.on("trackSubscribed", (track: RemoteTrack) => {
-        attachTrack(track, track.kind === Track.Kind.Video);
-        if (track.kind === Track.Kind.Video && remoteVideoRef.current) {
-          track.attach(remoteVideoRef.current);
-        }
+        attachRemoteTrack(track);
       });
-      // Attach existing tracks
+
+      // Already-published tracks — iterate publications and subscribe/attach
       participant.trackPublications.forEach((pub: RemoteTrackPublication) => {
-        if (pub.track) {
-          if (pub.track.kind === Track.Kind.Video && remoteVideoRef.current) {
-            pub.track.attach(remoteVideoRef.current);
-          }
+        if (pub.isSubscribed && pub.track) {
+          attachRemoteTrack(pub.track as RemoteTrack);
+        } else if (!pub.isSubscribed) {
+          pub.setSubscribed(true);
+          // trackSubscribed will fire and call attachRemoteTrack
         }
       });
     },
-    [startTimer, attachTrack],
+    [startTimer, attachRemoteTrack],
   );
 
   const connect = useCallback(async () => {
@@ -216,16 +234,24 @@ export function ConsultationRoom({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ roomName, status: "ended" }),
     }).catch(() => {});
-    router.push("/doctors");
+    router.push(exitPath);
   }, [roomName, router, stopTimer]);
 
-  // Attach local video track once the video element is mounted (connectionState changes to 'connected')
+  // Once the connected screen renders, attach both local and any pending remote tracks
   useEffect(() => {
     if (connectionState !== "connected") return;
-    const track = localVideoTrackRef.current;
-    const el = localVideoRef.current;
-    if (track && el) {
-      track.attach(el);
+
+    // Attach local video
+    const localTrack = localVideoTrackRef.current;
+    if (localTrack && localVideoRef.current) {
+      localTrack.attach(localVideoRef.current);
+    }
+
+    // Flush any remote track that arrived before the video element mounted
+    const remoteTrack = pendingRemoteTrackRef.current;
+    if (remoteTrack && remoteVideoRef.current) {
+      remoteTrack.attach(remoteVideoRef.current);
+      pendingRemoteTrackRef.current = null;
     }
   }, [connectionState]);
 
@@ -289,7 +315,7 @@ export function ConsultationRoom({
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => router.push("/doctors")}
+                onClick={() => router.push(exitPath)}
               >
                 Cancel
               </Button>
@@ -327,8 +353,8 @@ export function ConsultationRoom({
               {formatDuration(callDuration)}
             </span>
           </p>
-          <Button onClick={() => router.push("/doctors")} className="w-full">
-            Back to Professionals
+          <Button onClick={() => router.push(exitPath)} className="w-full">
+            {isDoctor ? "Back to Dashboard" : "Back to Professionals"}
           </Button>
         </div>
       </div>
@@ -351,22 +377,22 @@ export function ConsultationRoom({
           {!remoteConnected && (
             <div className="absolute inset-0 flex flex-col items-center justify-center text-zinc-400 gap-3">
               <div className="h-16 w-16 rounded-full bg-zinc-800 flex items-center justify-center text-2xl font-serif text-zinc-300">
-                {professional.full_name
-                  .split(" ")
-                  .map((n) => n[0])
-                  .join("")
-                  .slice(0, 2)}
+                {isDoctor
+                  ? "?"
+                  : professional.full_name
+                      .split(" ")
+                      .map((n: string) => n[0])
+                      .join("")
+                      .slice(0, 2)}
               </div>
-              <p className="text-sm">
-                Waiting for {professional.full_name} to join…
-              </p>
+              <p className="text-sm">Waiting for {remoteLabel} to join…</p>
             </div>
           )}
-          {/* Doctor name label */}
+          {/* Remote participant name label */}
           <div className="absolute bottom-3 left-3">
             <span className="text-xs text-white bg-black/50 backdrop-blur-sm rounded-full px-3 py-1 flex items-center gap-1.5">
-              <Shield className="h-3 w-3 text-green-400" />
-              {professional.full_name}
+              {!isDoctor && <Shield className="h-3 w-3 text-green-400" />}
+              {remoteLabel}
             </span>
           </div>
         </div>
@@ -389,7 +415,7 @@ export function ConsultationRoom({
           )}
           <div className="absolute bottom-3 left-3">
             <span className="text-xs text-white bg-black/50 backdrop-blur-sm rounded-full px-3 py-1">
-              You
+              {localLabel}
             </span>
           </div>
           {isMuted && (
