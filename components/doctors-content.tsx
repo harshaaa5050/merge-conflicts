@@ -13,7 +13,6 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import {
   Search,
-  Phone,
   Mail,
   ShieldCheck,
   ShieldOff,
@@ -22,6 +21,8 @@ import {
   Stethoscope,
   Video,
   Loader2,
+  Sparkles,
+  Lock,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -44,10 +45,10 @@ interface Professional {
 interface DoctorsContentProps {
   professionals: Professional[];
   currentUserId: string;
+  isPremium: boolean;
 }
 
-// Users only ever see verified professionals — unverified are always hidden
-const ROLE_FILTERS = ["All", "Psychologist", "Counsellor", "Psychiatrist", "Gynaecologist"];
+const ROLE_FILTERS = ["All", "Doctor", "Counsellor"];
 
 const STATUS_CONFIG = {
   verified: {
@@ -66,7 +67,7 @@ const STATUS_CONFIG = {
     label: "Not Verified",
     icon: ShieldOff,
     className:
-      "border-pink-400/40 text-pink-700 dark:text-pink-400 bg-pink-50 dark:bg-pink-900/20",
+      "border-red-400/40 text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-900/20",
   },
 };
 
@@ -78,13 +79,11 @@ const REG_TYPE_CONFIG = {
 export function DoctorsContent({
   professionals,
   currentUserId,
+  isPremium,
 }: DoctorsContentProps) {
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
   const [roleFilter, setRoleFilter] = useState("All");
-
-  // Always hide unverified — users must never see pending or rejected professionals
-  const verified = professionals.filter((p) => p.is_verified);
   const [showAll, setShowAll] = useState(false);
   const [startingCall, setStartingCall] = useState<string | null>(null);
 
@@ -104,32 +103,30 @@ export function DoctorsContent({
     [currentUserId, router],
   );
 
-  const filtered = verified.filter((p) => {
+  const filtered = professionals.filter((p) => {
     const q = searchQuery.toLowerCase();
     const matchesSearch =
       p.full_name.toLowerCase().includes(q) ||
-      p.specialization.toLowerCase().includes(q);
-
-    if (roleFilter === "All") return matchesSearch;
-
-    // Map filter labels to specialization keywords
-    const FILTER_MAP: Record<string, string[]> = {
-      Psychologist: ["psychology", "counselling psychology", "clinical psychology"],
-      Counsellor:   ["counsellor", "counseling", "therapy"],
-      Psychiatrist: ["psychiatry", "psychiatrist"],
-      Gynaecologist:["gynaecolog", "obstetrics"],
-    };
-    const keywords = FILTER_MAP[roleFilter] || [roleFilter.toLowerCase()];
-    const matchesRole = keywords.some(
-      (kw) =>
-        p.specialization.toLowerCase().includes(kw) ||
-        p.role.toLowerCase().includes(kw)
-    );
+      p.specialization.toLowerCase().includes(q) ||
+      p.registration_type.toLowerCase().includes(q);
+    const matchesRole =
+      roleFilter === "All" || p.role.toLowerCase() === roleFilter.toLowerCase();
     return matchesSearch && matchesRole;
   });
 
+  // When showAll is false, show verified first, then others (for non-owners)
+  const displayed = showAll
+    ? filtered
+    : filtered.filter(
+        (p) => p.is_verified || !professionals.some((x) => x.is_verified),
+      );
+
+  // If there are verified professionals, default to showing only them unless user clicks "Show all"
+  const hasVerified = professionals.some((p) => p.is_verified);
+  const hiddenCount = filtered.length - displayed.length;
+
   return (
-    <main className=" px-4 py-8 max-w-5xl mx-auto">
+    <main className="  px-4 py-8 max-w-5xl mx-auto">
       <div className="mb-8">
         <h1 className="font-serif text-3xl font-medium text-foreground">
           Find Professional Help
@@ -138,6 +135,37 @@ export function DoctorsContent({
           Connect with NMC and RCI registered mental health professionals
         </p>
       </div>
+
+      {/* Premium paywall banner — shown only to non-premium users */}
+      {!isPremium && (
+        <div className="mb-6 rounded-2xl border border-primary/20 bg-gradient-to-r from-primary/5 via-accent/5 to-primary/5 p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="flex items-start gap-3">
+            <div className="mt-0.5 h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+              <Lock className="h-4 w-4 text-primary" />
+            </div>
+            <div>
+              <p className="font-medium text-foreground text-sm">
+                Video calls are a Premium feature
+              </p>
+              <p className="text-muted-foreground text-xs mt-0.5">
+                Upgrade to MatriAI Premium to start 1-to-1 video consultations
+                with verified doctors. Currently{" "}
+                <span className="line-through text-muted-foreground/70">
+                  ₹200
+                </span>{" "}
+                <span className="font-semibold text-primary">FREE</span> —
+                launching offer.
+              </p>
+            </div>
+          </div>
+          <Button asChild size="sm" className="shrink-0 gap-2 rounded-full">
+            <Link href="/premium">
+              <Sparkles className="h-3.5 w-3.5" />
+              Get Premium Free
+            </Link>
+          </Button>
+        </div>
+      )}
 
       {/* Search + Filter row */}
       <div className="flex flex-col sm:flex-row gap-3 mb-6">
@@ -197,14 +225,16 @@ export function DoctorsContent({
       ) : (
         <>
           <div className="grid gap-4 md:grid-cols-2">
-            {filtered.map((pro: Professional) => {
+            {displayed.map((pro) => {
               const statusCfg = STATUS_CONFIG[pro.status];
               const StatusIcon = statusCfg.icon;
 
               return (
                 <Card
                   key={pro.id}
-                  className="border shadow-md hover:shadow-lg transition-shadow"
+                  className={`border shadow-md hover:shadow-lg transition-shadow ${
+                    !pro.is_verified ? "opacity-75" : ""
+                  }`}
                 >
                   <CardHeader className="pb-3">
                     <div className="flex items-start gap-4">
@@ -236,7 +266,7 @@ export function DoctorsContent({
                           {/* Registration type */}
                           <Badge
                             variant="outline"
-                          className={`text-xs ${REG_TYPE_CONFIG[pro.registration_type as keyof typeof REG_TYPE_CONFIG]}`}
+                            className={`text-xs ${REG_TYPE_CONFIG[pro.registration_type]}`}
                           >
                             {pro.registration_type} Registered
                           </Badge>
@@ -277,31 +307,36 @@ export function DoctorsContent({
                       </p>
                     </div>
 
-                    {/* All shown professionals are verified — contact is always available */}
-                    <div className="flex gap-2 pt-1">
-                      <Button asChild size="sm" className="flex-1">
-                        <a href={`mailto:${pro.email}`}>
-                          <Mail className="h-4 w-4 mr-2" />
-                          Email
-                        </a>
-                      </Button>
-                    </div>
                     {/* Action buttons — only shown for verified */}
                     {pro.is_verified && (
                       <div className="flex gap-2 pt-1">
-                        <Button
-                          size="sm"
-                          className="flex-1 gap-2"
-                          onClick={() => startVideoCall(pro.id)}
-                          disabled={startingCall === pro.id}
-                        >
-                          {startingCall === pro.id ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <Video className="h-4 w-4" />
-                          )}
-                          Video Call
-                        </Button>
+                        {isPremium ? (
+                          <Button
+                            size="sm"
+                            className="flex-1 gap-2"
+                            onClick={() => startVideoCall(pro.id)}
+                            disabled={startingCall === pro.id}
+                          >
+                            {startingCall === pro.id ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Video className="h-4 w-4" />
+                            )}
+                            Video Call
+                          </Button>
+                        ) : (
+                          <Button
+                            asChild
+                            size="sm"
+                            variant="outline"
+                            className="flex-1 gap-2 border-primary/30 text-primary hover:bg-primary/5"
+                          >
+                            <Link href="/premium">
+                              <Lock className="h-3.5 w-3.5" />
+                              Unlock Video
+                            </Link>
+                          </Button>
+                        )}
                         <Button
                           asChild
                           size="sm"
@@ -333,7 +368,26 @@ export function DoctorsContent({
             })}
           </div>
 
-
+          {/* Show all / show less toggle */}
+          {hasVerified && hiddenCount > 0 && (
+            <div className="mt-6 text-center">
+              <Button variant="outline" onClick={() => setShowAll(true)}>
+                Show {hiddenCount} more professional
+                {hiddenCount !== 1 ? "s" : ""} (pending / unverified)
+              </Button>
+            </div>
+          )}
+          {showAll && hasVerified && (
+            <div className="mt-2 text-center">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowAll(false)}
+              >
+                Show verified only
+              </Button>
+            </div>
+          )}
         </>
       )}
 
