@@ -1,10 +1,8 @@
-import { createServerClient } from '@supabase/ssr'
-import { NextResponse, type NextRequest } from 'next/server'
+import { createServerClient } from "@supabase/ssr";
+import { NextResponse, type NextRequest } from "next/server";
 
 export async function updateSession(request: NextRequest) {
-  let supabaseResponse = NextResponse.next({
-    request,
-  })
+  const response = NextResponse.next();
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -12,60 +10,50 @@ export async function updateSession(request: NextRequest) {
     {
       cookies: {
         getAll() {
-          return request.cookies.getAll()
+          return request.cookies.getAll();
         },
         setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value }) =>
-            request.cookies.set(name, value),
-          )
-          supabaseResponse = NextResponse.next({
-            request,
-          })
-          cookiesToSet.forEach(({ name, value, options }) =>
-            supabaseResponse.cookies.set(name, value, options),
-          )
+          cookiesToSet.forEach(({ name, value, options }) => {
+            response.cookies.set(name, value, options);
+          });
         },
       },
     },
-  )
+  );
 
   const {
     data: { user },
-  } = await supabase.auth.getUser()
+  } = await supabase.auth.getUser();
 
-  // Protected routes — redirect to login if not authenticated
-  if (
-    (request.nextUrl.pathname.startsWith('/dashboard') ||
-      request.nextUrl.pathname.startsWith('/onboarding') ||
-      request.nextUrl.pathname.startsWith('/chat') ||
-      request.nextUrl.pathname.startsWith('/community') ||
-      request.nextUrl.pathname.startsWith('/doctors') ||
-      request.nextUrl.pathname.startsWith('/techniques')) &&
-    !user
-  ) {
-    const url = request.nextUrl.clone()
-    url.pathname = '/auth/login'
-    return NextResponse.redirect(url)
+  const path = request.nextUrl.pathname;
+
+  // 🔒 Protected routes
+  const protectedRoutes = [
+    "/dashboard",
+    "/onboarding",
+    "/chat",
+    "/community",
+    "/doctors",
+    "/techniques",
+  ];
+
+  const isProtected = protectedRoutes.some((route) => path.startsWith(route));
+
+  if (isProtected && !user) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/auth/login";
+    return NextResponse.redirect(url);
   }
 
-  // Redirect logged-in users away from auth pages
-  if (
-    (request.nextUrl.pathname.startsWith('/auth/login') ||
-      request.nextUrl.pathname.startsWith('/auth/sign-up')) &&
-    user
-  ) {
-    // Check onboarding status from database
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('onboarding_complete')
-      .eq('id', user.id)
-      .single()
+  // 🚫 Auth pages redirect (NO DB CALL HERE)
+  const isAuthPage =
+    path.startsWith("/auth/login") || path.startsWith("/auth/sign-up");
 
-    const url = request.nextUrl.clone()
-    // If onboarding done → always go to dashboard; otherwise → onboarding
-    url.pathname = profile?.onboarding_complete ? '/dashboard' : '/onboarding'
-    return NextResponse.redirect(url)
+  if (isAuthPage && user) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/dashboard"; // simple safe redirect
+    return NextResponse.redirect(url);
   }
 
-  return supabaseResponse
+  return response;
 }
