@@ -13,6 +13,7 @@ import {
   LogOut,
   Menu,
   X,
+  Sparkles,
 } from "lucide-react";
 import { useState } from "react";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -69,6 +70,17 @@ export function AppHeader() {
 
         <div className="hidden md:flex items-center gap-2">
           <ThemeToggle />
+          <Button
+            asChild
+            variant="ghost"
+            size="sm"
+            className="gap-2 text-primary font-medium"
+          >
+            <Link href="/premium">
+              <Sparkles className="h-4 w-4" />
+              Premium
+            </Link>
+          </Button>
           <Button
             variant="ghost"
             size="sm"

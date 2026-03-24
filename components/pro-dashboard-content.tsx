@@ -145,7 +145,7 @@ export function ProDashboardContent({
   };
 
   return (
-    <main className="container px-4 py-8 max-w-5xl mx-auto space-y-8">
+    <main className="  px-4 py-8 max-w-5xl mx-auto space-y-8">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>

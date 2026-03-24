@@ -8,17 +8,26 @@ export default async function DoctorsPage() {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-
   if (!user) redirect("/auth/login");
 
-  // Source of truth: professional_profiles only — no legacy doctors table
-  const { data: professionals, error } = await supabase
-    .from("professional_profiles")
-    .select(
-      "id, full_name, email, role, specialization, years_experience, license_number, registration_type, bio, status, is_verified, created_at",
-    )
-    .order("is_verified", { ascending: false }) // verified first
-    .order("created_at", { ascending: false });
+  const [{ data: professionals }, { data: profile }, { data: pro }] =
+    await Promise.all([
+      supabase
+        .from("professional_profiles")
+        .select(
+          "id, full_name, email, role, specialization, years_experience, license_number, registration_type, bio, status, is_verified, created_at",
+        )
+        .order("is_verified", { ascending: false })
+        .order("created_at", { ascending: false }),
+      supabase.from("profiles").select("is_premium").eq("id", user.id).single(),
+      supabase
+        .from("professional_profiles")
+        .select("is_premium")
+        .eq("user_id", user.id)
+        .maybeSingle(),
+    ]);
+
+  const isPremium = profile?.is_premium || pro?.is_premium || false;
 
   return (
     <div className="min-h-screen bg-background">
@@ -26,6 +35,7 @@ export default async function DoctorsPage() {
       <DoctorsContent
         professionals={professionals ?? []}
         currentUserId={user.id}
+        isPremium={isPremium}
       />
     </div>
   );
